@@ -7,6 +7,15 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 // bob과 alice를 위한 롤업 -> bob과 alice의 state를 추적해야 함!
+const AliceState = {
+  address: "0x5065Fd0b55a7eF076306b25Ef4aC7E34efDBBC2C",
+  value: 0,
+};
+const BobAddress = {
+  address: "0x2d0701AA56458BECa4f04F7b6af2325b6A437fb7",
+  value: 0,
+};
+// transaction은 순서대로 실해됨
 
 const app = express();
 app.use(express.json());
