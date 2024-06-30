@@ -3,16 +3,17 @@ import { ethers } from "ethers";
 import Rollup from "../../artifacts/contracts/rollup.sol/OptimisticRollup.json"; // 스마트 계약 ABI 파일
 import RollupModule from "../../ignition/deployments/chain-11155111/deployed_addresses.json";
 import * as dotenv from "dotenv";
+dotenv.config({ path: "../../.env" });
 import cors from "cors";
 
 dotenv.config();
 
 const AliceState = {
-  address: "0x5065Fd0b55a7eF076306b25Ef4aC7E34efDBBC2C",
+  address: process.env.ALICE_ADDRESS,
   value: 100,
 };
 const BobState = {
-  address: "0x2d0701AA56458BECa4f04F7b6af2325b6A437fb7",
+  address: process.env.BOB_ADDRESS,
   value: 100,
 };
 
@@ -20,7 +21,7 @@ const app = express();
 app.use(express.json());
 
 const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
-const privateKey = process.env.PRIVATE_KEY!;
+const privateKey = process.env.ADMIN_PRIVATE_KEY!;
 const wallet = new ethers.Wallet(privateKey, provider);
 const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
@@ -37,16 +38,10 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-app.post("/submit-transaction", (req: Request, res: Response) => {
-  const { transaction } = req.body;
-  transactions.push(transaction);
-  res.send("Transaction received");
-});
-
-app.post("/verify-signature", async (req: Request, res: Response) => {
-  const { tokenAddress, tokenABI, account, recipient, amount, tx, signature } =
+app.post("/transaction-submit", async (req: Request, res: Response) => {
+  const { tokenAddress, tokenABI, account, recipient, amount, signature } =
     req.body;
-  console.log("===========================================================");
+  console.log("============================================================");
   console.log("Received transaction: ", signature);
   try {
     console.log("Verifying Contract!");
@@ -92,18 +87,18 @@ app.post("/verify-signature", async (req: Request, res: Response) => {
     if (recoverAddress.toLowerCase() === account.toLowerCase()) {
       console.log("Signature is valid!!!");
       const sender =
-        account.toLowerCase() === AliceState.address.toLowerCase()
+        account.toLowerCase() === AliceState.address!.toLowerCase()
           ? "Alice"
           : "Bob";
       const receiver =
-        account.toLowerCase() === AliceState.address.toLowerCase()
+        account.toLowerCase() === AliceState.address!.toLowerCase()
           ? "Bob"
           : "Alice";
 
-      if (account.toLowerCase() === AliceState.address.toLowerCase()) {
+      if (account.toLowerCase() === AliceState.address!.toLowerCase()) {
         AliceState.value -= Number(amount);
         BobState.value += Number(amount);
-      } else if (account.toLowerCase() === BobState.address.toLowerCase()) {
+      } else if (account.toLowerCase() === BobState.address!.toLowerCase()) {
         BobState.value -= Number(amount);
         AliceState.value += Number(amount);
       }
@@ -120,9 +115,29 @@ app.post("/verify-signature", async (req: Request, res: Response) => {
       console.log("Alice Balance: ", AliceState.value);
       console.log("Bob Balance: ", BobState.value);
       console.log(
-        "==========================================================="
+        "============================================================"
       );
+
       res.send("Signature is valid");
+
+      // Check if there are at least 3 transactions and submit the block if true
+      if (transactions.length >= 3) {
+        try {
+          console.log(
+            "************************************************************"
+          );
+          console.log("3 transactions accumulated. Starting block submission.");
+          await submitRollupBlock();
+          console.log(
+            "************************************************************"
+          );
+        } catch (error) {
+          console.error(
+            "Failed to submit rollup block after verifying signature:",
+            error
+          );
+        }
+      }
     } else {
       res.status(400).send("Invalid signature");
     }
@@ -132,28 +147,60 @@ app.post("/verify-signature", async (req: Request, res: Response) => {
   }
 });
 
-app.post("/submit-rollup-block", async (req: Request, res: Response) => {
-  if (transactions.length === 0) {
-    return res.status(400).send("No transactions to rollup");
-  }
-
+const submitRollupBlock = async () => {
   try {
-    const previousBlockHash = ethers.keccak256("0x");
-    const stateRoot = ethers.keccak256("0x");
+    // Fetch the last block to get the previous block hash
+    const lastBlockIndex = (await contract.blocks.length) - 1;
+    const lastBlock = await contract.blocks(lastBlockIndex);
+    const previousBlockHash = ethers.keccak256(
+      ethers.solidityPacked(
+        ["uint256", "bytes32", "bytes32", "bytes", "uint256"],
+        [
+          lastBlock.blockNumber,
+          lastBlock.previousBlockHash,
+          lastBlock.stateRoot,
+          lastBlock.data,
+          lastBlock.timestamp,
+        ]
+      )
+    );
+
+    // Compute the current state root
+    const aliceBalanceHash = ethers.keccak256(
+      ethers.solidityPacked(["uint256"], [AliceState.value])
+    );
+    const bobBalanceHash = ethers.keccak256(
+      ethers.solidityPacked(["uint256"], [BobState.value])
+    );
+    const stateRoot = ethers.keccak256(
+      ethers.solidityPacked(
+        ["bytes32", "bytes32"],
+        [aliceBalanceHash, bobBalanceHash]
+      )
+    );
+
+    // Serialize transactions
     const data = ethers.hexlify(
       ethers.toUtf8Bytes(JSON.stringify(transactions))
     );
 
+    // Submit the block to the smart contract
+    console.log("Submitting rollup block with the following details:");
+    console.log("Previous Block Hash:", previousBlockHash);
+    console.log("State Root:", stateRoot);
+    console.log("Transactions:", transactions);
+
     const tx = await contract.submitBlock(previousBlockHash, stateRoot, data);
     await tx.wait();
 
-    transactions = []; // 트랜잭션 초기화
-    res.send("Rollup block submitted");
+    // Clear the transactions array
+    transactions = [];
+    console.log("Rollup block submitted successfully");
   } catch (error) {
-    console.error(error);
-    res.status(500).send("Error submitting rollup block");
+    console.error("Error submitting rollup block:", error);
+    throw error;
   }
-});
+};
 
 app.get("/balances", (req: Request, res: Response) => {
   res.json({ alice: AliceState.value, bob: BobState.value });

@@ -2,16 +2,17 @@ import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import axios from "axios";
 import "./App.css";
+import config from "./config";
 
-const tokenAddress = "0xbaFce01f990E75Cb6Bad127aD9dafF3Ea3901430";
+const aliceAddress = config.aliceAddress;
+const bobAddress = config.bobAddress;
+const adminAddress = config.adminAddress;
+const tokenAddress = config.tokenAddress;
+
 const tokenABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function transfer(address to, uint256 amount) returns (bool)",
 ];
-
-const aliceAddress = "0x5065Fd0b55a7eF076306b25Ef4aC7E34efDBBC2C";
-const bobAddress = "0x2d0701AA56458BECa4f04F7b6af2325b6A437fb7";
-const adminAddress = "0x9ed176BF982EF834B1024E6a92C10CB5754362bd";
 
 function App() {
   const [account, setAccount] = useState("");
@@ -80,7 +81,7 @@ function App() {
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
         const tokenContract = new ethers.Contract(
-          tokenAddress,
+          tokenAddress!,
           tokenABI,
           signer
         );
@@ -116,15 +117,17 @@ function App() {
 
         console.log("Signed Transaction:", signature);
 
-        const res = await axios.post("http://localhost:8080/verify-signature", {
-          tokenAddress,
-          tokenABI,
-          account,
-          recipient,
-          amount,
-          tx,
-          signature,
-        });
+        const res = await axios.post(
+          "http://localhost:8080/transaction-submit",
+          {
+            tokenAddress,
+            tokenABI,
+            account,
+            recipient,
+            amount,
+            signature,
+          }
+        );
 
         console.log(res);
         fetchBalances(); // Fetch balances after the transaction
@@ -158,7 +161,7 @@ function App() {
                 />
                 <button
                   className="send-button"
-                  onClick={() => signTransaction(bobAddress)}
+                  onClick={() => signTransaction(bobAddress!)}
                 >
                   Send to Bob
                 </button>
@@ -177,7 +180,7 @@ function App() {
                 />
                 <button
                   className="send-button"
-                  onClick={() => signTransaction(aliceAddress)}
+                  onClick={() => signTransaction(aliceAddress!)}
                 >
                   Send to Alice
                 </button>
