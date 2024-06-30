@@ -25,8 +25,10 @@ const wallet = new ethers.Wallet(privateKey, provider);
 const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
 
-// Change transactions to be an array of objects
-let transactions: { value: any; signature: any }[] = [];
+let transactions: {
+  transaction: { from: string; to: string; amount: string };
+  signature: any;
+}[] = [];
 
 const corsOptions = {
   origin: "http://localhost:3000",
@@ -41,14 +43,13 @@ app.post("/submit-transaction", (req: Request, res: Response) => {
   res.send("Transaction received");
 });
 
-// 서명된 트랜잭션 검증 엔드포인트
 app.post("/verify-signature", async (req: Request, res: Response) => {
   const { tokenAddress, tokenABI, account, recipient, amount, tx, signature } =
     req.body;
   console.log("===========================================================");
-  console.log("Recieved transaction: ", signature);
+  console.log("Received transaction: ", signature);
   try {
-    console.log("Verifing Contract!");
+    console.log("Verifying Contract!");
     const tokenContract = new ethers.Contract(tokenAddress, tokenABI, wallet);
 
     const tx = {
@@ -84,8 +85,7 @@ app.post("/verify-signature", async (req: Request, res: Response) => {
       value,
       signature
     );
-    console.log("recovered address: ", recoverAddress);
-    // 서명자 주소와 주어진 계정 비교
+    console.log("Recovered address: ", recoverAddress);
     console.log(
       "Verifying that the recovered address matches the signed address"
     );
@@ -111,7 +111,10 @@ app.post("/verify-signature", async (req: Request, res: Response) => {
       console.log(
         `Pushing Transaction: ${sender} to ${receiver} ${amount} ETH`
       );
-      transactions.push({ value, signature });
+      transactions.push({
+        transaction: { from: sender, to: receiver, amount },
+        signature,
+      });
 
       console.log("Final State: ");
       console.log("Alice Balance: ", AliceState.value);
@@ -154,6 +157,10 @@ app.post("/submit-rollup-block", async (req: Request, res: Response) => {
 
 app.get("/balances", (req: Request, res: Response) => {
   res.json({ alice: AliceState.value, bob: BobState.value });
+});
+
+app.get("/transactions", (req: Request, res: Response) => {
+  res.json(transactions);
 });
 
 const PORT = process.env.PORT || 8080;

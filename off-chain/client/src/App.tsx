@@ -11,12 +11,19 @@ const tokenABI = [
 
 const aliceAddress = "0x5065Fd0b55a7eF076306b25Ef4aC7E34efDBBC2C";
 const bobAddress = "0x2d0701AA56458BECa4f04F7b6af2325b6A437fb7";
+const adminAddress = "0x9ed176BF982EF834B1024E6a92C10CB5754362bd";
 
 function App() {
   const [account, setAccount] = useState("");
   const [message, setMessage] = useState("지갑을 연결하세요");
   const [amount, setAmount] = useState("");
   const [balances, setBalances] = useState({ alice: 0, bob: 0 });
+  const [transactions, setTransactions] = useState<
+    {
+      transaction: { from: string; to: string; amount: string };
+      signature: string;
+    }[]
+  >([]);
 
   useEffect(() => {
     if (account) {
@@ -24,6 +31,8 @@ function App() {
         setMessage("Hello Alice");
       } else if (account === bobAddress) {
         setMessage("Hello Bob");
+      } else if (account === adminAddress) {
+        setMessage("Hello Admin");
       } else {
         setMessage("Who are you?");
       }
@@ -53,6 +62,15 @@ function App() {
       setBalances(response.data);
     } catch (error) {
       console.error("Error fetching balances:", error);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      const response = await axios.get("http://localhost:8080/transactions");
+      setTransactions(response.data);
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
     }
   };
 
@@ -163,6 +181,29 @@ function App() {
                 >
                   Send to Alice
                 </button>
+              </div>
+            </>
+          )}
+          {account === adminAddress && (
+            <>
+              <h2>Alice's Balance: {balances.alice}</h2>
+              <h2>Bob's Balance: {balances.bob}</h2>
+              <button
+                className="transaction-button"
+                onClick={fetchTransactions}
+              >
+                Fetch Transactions
+              </button>
+              <div className="transaction-list">
+                <h3>Transactions:</h3>
+                <ul>
+                  {transactions.map((tx, index) => (
+                    <li key={index}>
+                      {tx.transaction.from} sent {tx.transaction.amount} ETH to{" "}
+                      {tx.transaction.to}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </>
           )}
