@@ -46,3 +46,7 @@
 5.  Create blocks
 
         After every 3 transactions a block is submitted to the sepolia network
+
+## To do List
+
+1. hardhat not deploying
