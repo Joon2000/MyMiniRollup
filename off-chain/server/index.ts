@@ -9,11 +9,11 @@ dotenv.config();
 
 const AliceState = {
   address: "0x5065Fd0b55a7eF076306b25Ef4aC7E34efDBBC2C",
-  value: 0,
+  value: 100,
 };
-const BobAddress = {
+const BobState = {
   address: "0x2d0701AA56458BECa4f04F7b6af2325b6A437fb7",
-  value: 0,
+  value: 100,
 };
 
 const app = express();
@@ -25,7 +25,8 @@ const wallet = new ethers.Wallet(privateKey, provider);
 const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
 
-let transactions: string[] = [];
+// Change transactions to be an array of objects
+let transactions: { value: any; signature: any }[] = [];
 
 const corsOptions = {
   origin: "http://localhost:3000",
@@ -34,7 +35,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// 트랜잭션 수집 엔드포인트
 app.post("/submit-transaction", (req: Request, res: Response) => {
   const { transaction } = req.body;
   transactions.push(transaction);
@@ -43,23 +43,30 @@ app.post("/submit-transaction", (req: Request, res: Response) => {
 
 // 서명된 트랜잭션 검증 엔드포인트
 app.post("/verify-signature", async (req: Request, res: Response) => {
-  const { tx, account, recipient, amount, signature } = req.body;
-
+  const { tokenAddress, tokenABI, account, recipient, amount, tx, signature } =
+    req.body;
+  console.log("===========================================================");
+  console.log("Recieved transaction: ", signature);
   try {
+    console.log("Verifing Contract!");
+    const tokenContract = new ethers.Contract(tokenAddress, tokenABI, wallet);
+
+    const tx = {
+      to: tokenAddress,
+      data: tokenContract.interface.encodeFunctionData("transfer", [
+        recipient,
+        amount,
+      ]),
+    };
+
     const domain = {
       name: "Token",
       version: "1",
-      chainId: (await provider.getNetwork()).chainId.toString(), // Convert BigInt to string
-      verifyingContract: tx.to,
+      chainId: 11155111,
+      verifyingContract: tokenAddress,
     };
 
     const types = {
-      EIP712Domain: [
-        { name: "name", type: "string" },
-        { name: "version", type: "string" },
-        { name: "chainId", type: "string" },
-        { name: "verifyingContract", type: "address" },
-      ],
       Transaction: [
         { name: "to", type: "address" },
         { name: "data", type: "bytes" },
@@ -71,23 +78,47 @@ app.post("/verify-signature", async (req: Request, res: Response) => {
       data: tx.data,
     };
 
-    const msgParams = JSON.stringify({
+    const recoverAddress = ethers.verifyTypedData(
       domain,
-      message: value,
-      primaryType: "Transaction",
       types,
-    });
-
-    // 메시지 해시
-    const msgHash = ethers.hashMessage(msgParams);
-
-    // 서명에서 공개키 추출
-    const signerAddress = ethers.recoverAddress(msgHash, signature);
-    console.log(signerAddress);
-    console.log(account);
-
+      value,
+      signature
+    );
+    console.log("recovered address: ", recoverAddress);
     // 서명자 주소와 주어진 계정 비교
-    if (signerAddress.toLowerCase() === account.toLowerCase()) {
+    console.log(
+      "Verifying that the recovered address matches the signed address"
+    );
+    if (recoverAddress.toLowerCase() === account.toLowerCase()) {
+      console.log("Signature is valid!!!");
+      const sender =
+        account.toLowerCase() === AliceState.address.toLowerCase()
+          ? "Alice"
+          : "Bob";
+      const receiver =
+        account.toLowerCase() === AliceState.address.toLowerCase()
+          ? "Bob"
+          : "Alice";
+
+      if (account.toLowerCase() === AliceState.address.toLowerCase()) {
+        AliceState.value -= Number(amount);
+        BobState.value += Number(amount);
+      } else if (account.toLowerCase() === BobState.address.toLowerCase()) {
+        BobState.value -= Number(amount);
+        AliceState.value += Number(amount);
+      }
+
+      console.log(
+        `Pushing Transaction: ${sender} to ${receiver} ${amount} ETH`
+      );
+      transactions.push({ value, signature });
+
+      console.log("Final State: ");
+      console.log("Alice Balance: ", AliceState.value);
+      console.log("Bob Balance: ", BobState.value);
+      console.log(
+        "==========================================================="
+      );
       res.send("Signature is valid");
     } else {
       res.status(400).send("Invalid signature");
@@ -106,7 +137,9 @@ app.post("/submit-rollup-block", async (req: Request, res: Response) => {
   try {
     const previousBlockHash = ethers.keccak256("0x");
     const stateRoot = ethers.keccak256("0x");
-    const data = ethers.hexlify(String(transactions));
+    const data = ethers.hexlify(
+      ethers.toUtf8Bytes(JSON.stringify(transactions))
+    );
 
     const tx = await contract.submitBlock(previousBlockHash, stateRoot, data);
     await tx.wait();
@@ -117,6 +150,10 @@ app.post("/submit-rollup-block", async (req: Request, res: Response) => {
     console.error(error);
     res.status(500).send("Error submitting rollup block");
   }
+});
+
+app.get("/balances", (req: Request, res: Response) => {
+  res.json({ alice: AliceState.value, bob: BobState.value });
 });
 
 const PORT = process.env.PORT || 8080;

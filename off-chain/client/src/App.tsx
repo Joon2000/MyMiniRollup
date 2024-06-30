@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
+import axios from "axios";
 import "./App.css";
 
-const tokenAddress = "0xbaFce01f990E75Cb6Bad127aD9dafF3Ea3901430"; // ERC-20 토큰 계약 주소를 여기에 입력하세요.
+const tokenAddress = "0xbaFce01f990E75Cb6Bad127aD9dafF3Ea3901430";
 const tokenABI = [
-  // ERC-20 토큰의 기본 ABI
   "function balanceOf(address owner) view returns (uint256)",
   "function transfer(address to, uint256 amount) returns (bool)",
 ];
@@ -16,6 +16,7 @@ function App() {
   const [account, setAccount] = useState("");
   const [message, setMessage] = useState("지갑을 연결하세요");
   const [amount, setAmount] = useState("");
+  const [balances, setBalances] = useState({ alice: 0, bob: 0 });
 
   useEffect(() => {
     if (account) {
@@ -26,6 +27,7 @@ function App() {
       } else {
         setMessage("Who are you?");
       }
+      fetchBalances();
     }
   }, [account]);
 
@@ -34,8 +36,8 @@ function App() {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
-        const signer = provider.getSigner();
-        const address = await (await signer).getAddress();
+        const signer = await provider.getSigner();
+        const address = await signer.getAddress();
         setAccount(address);
       } catch (error) {
         console.error(error);
@@ -45,41 +47,42 @@ function App() {
     }
   };
 
+  const fetchBalances = async () => {
+    try {
+      const response = await axios.get("http://localhost:8080/balances");
+      setBalances(response.data);
+    } catch (error) {
+      console.error("Error fetching balances:", error);
+    }
+  };
+
   const signTransaction = async (recipient: string) => {
     if (window.ethereum && account && amount) {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
-        const signer = provider.getSigner();
+        const signer = await provider.getSigner();
         const tokenContract = new ethers.Contract(
           tokenAddress,
           tokenABI,
-          await signer
+          signer
         );
-
-        const chainId = 11155111;
 
         const tx = {
           to: tokenAddress,
           data: tokenContract.interface.encodeFunctionData("transfer", [
             recipient,
-            ethers.parseUnits(amount, 18).toString(), // Assuming 18 decimals
+            amount,
           ]),
         };
 
         const domain = {
           name: "Token",
           version: "1",
-          chainId: chainId, // Convert BigInt to string
+          chainId: 11155111,
           verifyingContract: tokenAddress,
         };
 
         const types = {
-          EIP712Domain: [
-            { name: "name", type: "string" },
-            { name: "version", type: "string" },
-            { name: "chainId", type: "uint256" },
-            { name: "verifyingContract", type: "address" },
-          ],
           Transaction: [
             { name: "to", type: "address" },
             { name: "data", type: "bytes" },
@@ -91,19 +94,22 @@ function App() {
           data: tx.data,
         };
 
-        const msgParams = JSON.stringify({
-          domain,
-          message: value,
-          primaryType: "Transaction",
-          types,
+        const signature = await signer.signTypedData(domain, types, value);
+
+        console.log("Signed Transaction:", signature);
+
+        const res = await axios.post("http://localhost:8080/verify-signature", {
+          tokenAddress,
+          tokenABI,
+          account,
+          recipient,
+          amount,
+          tx,
+          signature,
         });
 
-        const signedTx = await window.ethereum.request({
-          method: "eth_signTypedData_v4",
-          params: [account, msgParams],
-        });
-
-        console.log("Signed Transaction:", signedTx);
+        console.log(res);
+        fetchBalances(); // Fetch balances after the transaction
       } catch (error) {
         console.error(error);
       }
@@ -115,24 +121,50 @@ function App() {
   return (
     <div className="app">
       <h1>{message}</h1>
-      {!account && <button onClick={connectWallet}>메타마스크에 연결</button>}
+      {!account && (
+        <button className="connect-button" onClick={connectWallet}>
+          메타마스크에 연결
+        </button>
+      )}
       {account && (
-        <div>
-          <input
-            type="text"
-            placeholder="보낼 금액"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
+        <div className="balance-container">
           {account === aliceAddress && (
-            <button onClick={() => signTransaction(bobAddress)}>
-              Send to Bob
-            </button>
+            <>
+              <h2>Alice's Balance: {balances.alice}</h2>
+              <div className="transaction-container">
+                <input
+                  type="text"
+                  placeholder="보낼 금액"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <button
+                  className="send-button"
+                  onClick={() => signTransaction(bobAddress)}
+                >
+                  Send to Bob
+                </button>
+              </div>
+            </>
           )}
           {account === bobAddress && (
-            <button onClick={() => signTransaction(aliceAddress)}>
-              Send to Alice
-            </button>
+            <>
+              <h2>Bob's Balance: {balances.bob}</h2>
+              <div className="transaction-container">
+                <input
+                  type="text"
+                  placeholder="보낼 금액"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <button
+                  className="send-button"
+                  onClick={() => signTransaction(aliceAddress)}
+                >
+                  Send to Alice
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}
