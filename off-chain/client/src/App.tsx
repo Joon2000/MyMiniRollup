@@ -56,9 +56,7 @@ function App() {
           await signer
         );
 
-        const chainId = await provider
-          .getNetwork()
-          .then((network) => network.chainId);
+        const chainId = 11155111;
 
         const tx = {
           to: tokenAddress,
@@ -71,7 +69,7 @@ function App() {
         const domain = {
           name: "Token",
           version: "1",
-          chainId: chainId.toString(), // Convert BigInt to string
+          chainId: chainId, // Convert BigInt to string
           verifyingContract: tokenAddress,
         };
 
