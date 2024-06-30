@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import { ethers } from "ethers";
 import Rollup from "../../artifacts/contracts/rollup.sol/OptimisticRollup.json"; // 스마트 계약 ABI 파일
-import RollupModule from "../../ignition/deployments/chain-11155111/deployed_addresses.json";
+// import RollupModule from "../../ignition/deployments/chain-11155111/deployed_addresses.json";
 import * as dotenv from "dotenv";
 dotenv.config({ path: "../../.env" });
 import cors from "cors";
@@ -23,7 +23,8 @@ app.use(express.json());
 const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 const privateKey = process.env.ADMIN_PRIVATE_KEY!;
 const wallet = new ethers.Wallet(privateKey, provider);
-const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
+// const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
+const contractAddress = "0x6850710e0a6d027f26f75d96e900b5dd05b49a3e";
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
 
 let transactions: {
@@ -150,7 +151,7 @@ app.post("/transaction-submit", async (req: Request, res: Response) => {
 const submitRollupBlock = async () => {
   try {
     // Fetch the last block to get the previous block hash
-    const lastBlockIndex = (await contract.blocks.length) - 1;
+    const lastBlockIndex = contract.blocks.length;
     const lastBlock = await contract.blocks(lastBlockIndex);
     const previousBlockHash = ethers.keccak256(
       ethers.solidityPacked(
