@@ -54,6 +54,10 @@ contract OptimisticRollup {
         return blocks[blockNumber];
     }
 
+    function getBlockCount() public view returns (uint256) {
+        return blocks.length;
+    }
+
     // function challengeBlock(uint256 blockNumber, bytes32 correctStateRoot, bytes memory proofData) public {
     //     require(blockNumber < blocks.length, "Invalid block number");
     //     require(!isChallenged[blockNumber], "Block already challenged");
