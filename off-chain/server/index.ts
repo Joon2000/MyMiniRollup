@@ -24,7 +24,7 @@ const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 const privateKey = process.env.ADMIN_PRIVATE_KEY!;
 const wallet = new ethers.Wallet(privateKey, provider);
 // const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
-const contractAddress = "0x6850710e0a6d027f26f75d96e900b5dd05b49a3e";
+const contractAddress = "0x6EAD8D93Dd09e6E68672d8Fb0d8FCaBB1c8e816F";
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
 
 let transactions: {
@@ -209,6 +209,35 @@ app.get("/balances", (req: Request, res: Response) => {
 
 app.get("/transactions", (req: Request, res: Response) => {
   res.json(transactions);
+});
+
+app.get("/current-block-number", async (req: Request, res: Response) => {
+  try {
+    const blockNumber = await contract.getBlockCount();
+    res.json({ blockNumber: blockNumber.toString() });
+  } catch (error) {
+    console.error("Error fetching block number:", error);
+    res.status(500).send("Error fetching block number");
+  }
+});
+
+app.get("/block/:blockNumber", async (req: Request, res: Response) => {
+  const { blockNumber } = req.params;
+  try {
+    const block = await contract.getBlock(blockNumber);
+    const data = ethers.toUtf8String(block.data);
+    const transactions = JSON.parse(data);
+    res.json({
+      blockNumber: block.blockNumber.toString(),
+      previousBlockHash: block.previousBlockHash,
+      stateRoot: block.stateRoot,
+      data: transactions,
+      timestamp: block.timestamp.toString(),
+    });
+  } catch (error) {
+    console.error("Error fetching block data:", error);
+    res.status(500).send("Error fetching block data");
+  }
 });
 
 const PORT = process.env.PORT || 8080;
