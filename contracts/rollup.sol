@@ -71,7 +71,6 @@ contract OptimisticRollup {
         return balances[account];
     }
 
-    // Uncomment and complete the challengeBlock function if you need challenge functionality in the future.
     // function challengeBlock(uint256 blockNumber, bytes32 correctStateRoot, bytes memory proofData) public {
     //     require(blockNumber < blocks.length, "Invalid block number");
     //     require(!isChallenged[blockNumber], "Block already challenged");
