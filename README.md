@@ -50,6 +50,6 @@
 
 ## To do List
 
-1. fetch balance from L1
+1. UI/UX -> after fetching data login available, admin page (current block number, searching block data < current number)
 2. Challengeing logic
 3. state storing logic
