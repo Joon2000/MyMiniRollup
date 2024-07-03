@@ -13,6 +13,8 @@ contract OptimisticRollup {
     RollupBlock[] public blocks;
     mapping(uint256 => bool) public isChallenged;
 
+    mapping(address => uint256) public balances;
+
     uint256 public constant CHALLENGE_PERIOD = 7 days;
 
     event BlockSubmitted(uint256 blockNumber, bytes32 stateRoot, bytes data, uint256 timestamp);
@@ -35,9 +37,16 @@ contract OptimisticRollup {
         emit BlockSubmitted(0, genesisStateRoot, genesisData, block.timestamp);
     }
 
-    function submitBlock(bytes32 previousBlockHash, bytes32 stateRoot, bytes memory data) public {
+    function submitBlock(bytes32 previousBlockHash, bytes32 stateRoot, bytes memory data, address[] memory accounts, uint256[] memory newBalances) public {
+        require(accounts.length == newBalances.length, "Accounts and balances length mismatch");
+        
         uint256 blockNumber = blocks.length;
         uint256 timestamp = block.timestamp;
+
+        // Update balances
+        for (uint256 i = 0; i < accounts.length; i++) {
+            balances[accounts[i]] = newBalances[i];
+        }
 
         blocks.push(RollupBlock({
             blockNumber: blockNumber,
@@ -56,6 +65,10 @@ contract OptimisticRollup {
 
     function getBlockCount() public view returns (uint256) {
         return blocks.length;
+    }
+
+    function getBalance(address account) public view returns (uint256) {
+        return balances[account];
     }
 
     // function challengeBlock(uint256 blockNumber, bytes32 correctStateRoot, bytes memory proofData) public {

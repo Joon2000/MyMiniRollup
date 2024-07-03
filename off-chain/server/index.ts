@@ -8,13 +8,17 @@ import cors from "cors";
 
 dotenv.config();
 
+const aliceAddress = process.env.ALICE_ADDRESS!;
+const bobAddress = process.env.BOB_ADDRESS!;
+
 const AliceState = {
-  address: process.env.ALICE_ADDRESS,
-  value: 100,
+  address: aliceAddress,
+  value: 0,
 };
+
 const BobState = {
-  address: process.env.BOB_ADDRESS,
-  value: 100,
+  address: bobAddress,
+  value: 0,
 };
 
 const app = express();
@@ -24,13 +28,18 @@ const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 const privateKey = process.env.ADMIN_PRIVATE_KEY!;
 const wallet = new ethers.Wallet(privateKey, provider);
 // const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
-const contractAddress = "0x6EAD8D93Dd09e6E68672d8Fb0d8FCaBB1c8e816F";
+const contractAddress = "0x77d03cf6298b18DE57F72EB958f276C084aD4508";
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
 
 let transactions: {
   transaction: { from: string; to: string; amount: string };
   signature: any;
 }[] = [];
+
+const initializeBalances = async () => {
+  AliceState.value = Number(await contract.getBalance(aliceAddress));
+  BobState.value = Number(await contract.getBalance(bobAddress));
+};
 
 const corsOptions = {
   origin: "http://localhost:3000",
@@ -87,6 +96,15 @@ app.post("/transaction-submit", async (req: Request, res: Response) => {
     );
     if (recoverAddress.toLowerCase() === account.toLowerCase()) {
       console.log("Signature is valid!!!");
+
+      if (account.toLowerCase() === aliceAddress!.toLowerCase()) {
+        updateBalances(AliceState, BobState, amount);
+      } else if (account.toLowerCase() === bobAddress!.toLowerCase()) {
+        updateBalances(BobState, AliceState, amount);
+      } else {
+        throw new Error("Invalid account");
+      }
+
       const sender =
         account.toLowerCase() === AliceState.address!.toLowerCase()
           ? "Alice"
@@ -95,14 +113,6 @@ app.post("/transaction-submit", async (req: Request, res: Response) => {
         account.toLowerCase() === AliceState.address!.toLowerCase()
           ? "Bob"
           : "Alice";
-
-      if (account.toLowerCase() === AliceState.address!.toLowerCase()) {
-        AliceState.value -= Number(amount);
-        BobState.value += Number(amount);
-      } else if (account.toLowerCase() === BobState.address!.toLowerCase()) {
-        BobState.value -= Number(amount);
-        AliceState.value += Number(amount);
-      }
 
       console.log(
         `Pushing Transaction: ${sender} to ${receiver} ${amount} ETH`
@@ -148,10 +158,35 @@ app.post("/transaction-submit", async (req: Request, res: Response) => {
   }
 });
 
+const updateBalances = (
+  fromState: { address: string; value: number },
+  toState: { address: string; value: number },
+  amount: string
+) => {
+  const amountInt = parseInt(amount);
+  fromState.value -= amountInt;
+  toState.value += amountInt;
+};
+
+const computeStateRoot = (aliceBalance: number, bobBalance: number) => {
+  const aliceBalanceHash = ethers.keccak256(
+    ethers.solidityPacked(["uint256"], [aliceBalance])
+  );
+  const bobBalanceHash = ethers.keccak256(
+    ethers.solidityPacked(["uint256"], [bobBalance])
+  );
+  return ethers.keccak256(
+    ethers.solidityPacked(
+      ["bytes32", "bytes32"],
+      [aliceBalanceHash, bobBalanceHash]
+    )
+  );
+};
+
 const submitRollupBlock = async () => {
   try {
     // Fetch the last block to get the previous block hash
-    const lastBlockIndex = contract.blocks.length;
+    const lastBlockIndex = (await contract.getBlockCount()) - 1;
     const lastBlock = await contract.blocks(lastBlockIndex);
     const previousBlockHash = ethers.keccak256(
       ethers.solidityPacked(
@@ -167,18 +202,9 @@ const submitRollupBlock = async () => {
     );
 
     // Compute the current state root
-    const aliceBalanceHash = ethers.keccak256(
-      ethers.solidityPacked(["uint256"], [AliceState.value])
-    );
-    const bobBalanceHash = ethers.keccak256(
-      ethers.solidityPacked(["uint256"], [BobState.value])
-    );
-    const stateRoot = ethers.keccak256(
-      ethers.solidityPacked(
-        ["bytes32", "bytes32"],
-        [aliceBalanceHash, bobBalanceHash]
-      )
-    );
+    const aliceBalance = AliceState.value;
+    const bobBalance = BobState.value;
+    const stateRoot = computeStateRoot(aliceBalance, bobBalance);
 
     // Serialize transactions
     const data = ethers.hexlify(
@@ -227,6 +253,7 @@ app.get("/block/:blockNumber", async (req: Request, res: Response) => {
     const block = await contract.getBlock(blockNumber);
     const data = ethers.toUtf8String(block.data);
     const transactions = JSON.parse(data);
+
     res.json({
       blockNumber: block.blockNumber.toString(),
       previousBlockHash: block.previousBlockHash,
@@ -241,6 +268,7 @@ app.get("/block/:blockNumber", async (req: Request, res: Response) => {
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await initializeBalances(); // Initialize balances when the server starts
   console.log(`Server running on port ${PORT}`);
 });

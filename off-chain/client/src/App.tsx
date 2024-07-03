@@ -176,6 +176,15 @@ function App() {
     }
   };
 
+  const truncateText = (text: string, length: number) => {
+    if (text.length <= length) {
+      return text;
+    }
+    const start = text.slice(0, length / 2);
+    const end = text.slice(-length / 2);
+    return `${start}...${end}`;
+  };
+
   const handleBlockNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
     if (value >= 1) {
