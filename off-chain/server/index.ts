@@ -28,7 +28,7 @@ const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 const privateKey = process.env.ADMIN_PRIVATE_KEY!;
 const wallet = new ethers.Wallet(privateKey, provider);
 // const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
-const contractAddress = "0x77d03cf6298b18DE57F72EB958f276C084aD4508";
+const contractAddress = "0xcf55A6F17F338b811987bfFC74fb039AF74Dc597";
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
 
 let transactions: {
@@ -37,10 +37,25 @@ let transactions: {
 }[] = [];
 
 const initializeBalances = async () => {
-  AliceState.value = Number(await contract.getBalance(aliceAddress));
-  BobState.value = Number(await contract.getBalance(bobAddress));
-};
+  try {
+    // Call the contract's initializeBalances function
+    console.log(
+      "Fetching balances from Layer 1: If new address, 100 token is filled"
+    );
+    const tx = await contract.initializeBalances([aliceAddress, bobAddress]);
+    await tx.wait();
 
+    // Fetch the initialized balances
+    AliceState.value = Number(await contract.getBalance(aliceAddress));
+    BobState.value = Number(await contract.getBalance(bobAddress));
+
+    console.log("Balance checked!!");
+    console.log(`${AliceState.address} balance: ${AliceState.value}`);
+    console.log(`${BobState.address} balance: ${BobState.value}`);
+  } catch (error) {
+    console.error("Error initializing balances:", error);
+  }
+};
 const corsOptions = {
   origin: "http://localhost:3000",
   credentials: true, // 자격 증명을 허용하도록 설정

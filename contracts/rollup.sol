@@ -12,10 +12,11 @@ contract OptimisticRollup {
 
     RollupBlock[] public blocks;
     mapping(uint256 => bool) public isChallenged;
-
     mapping(address => uint256) public balances;
+    mapping(address => bool) public hasInteracted;
 
     uint256 public constant CHALLENGE_PERIOD = 7 days;
+    uint256 public constant INITIAL_BALANCE = 100;
 
     event BlockSubmitted(uint256 blockNumber, bytes32 stateRoot, bytes data, uint256 timestamp);
     event BlockChallenged(uint256 blockNumber, address challenger);
@@ -35,6 +36,15 @@ contract OptimisticRollup {
         }));
         
         emit BlockSubmitted(0, genesisStateRoot, genesisData, block.timestamp);
+    }
+
+    function initializeBalances(address[] memory accounts) public {
+        for (uint256 i = 0; i < accounts.length; i++) {
+            if (!hasInteracted[accounts[i]]) {
+                balances[accounts[i]] = INITIAL_BALANCE;
+                hasInteracted[accounts[i]] = true;
+            }
+        }
     }
 
     function submitBlock(bytes32 previousBlockHash, bytes32 stateRoot, bytes memory data, address[] memory accounts, uint256[] memory newBalances) public {
