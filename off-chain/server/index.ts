@@ -63,6 +63,10 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+app.get("/init-status", (req: Request, res: Response) => {
+  res.json({ status: "initialized" });
+});
+
 app.post("/transaction-submit", async (req: Request, res: Response) => {
   const { tokenAddress, tokenABI, account, recipient, amount, signature } =
     req.body;
@@ -201,7 +205,7 @@ const computeStateRoot = (aliceBalance: number, bobBalance: number) => {
 const submitRollupBlock = async () => {
   try {
     // Fetch the last block to get the previous block hash
-    const lastBlockIndex = (await contract.getBlockCount()) - 1;
+    const lastBlockIndex = Number(await contract.getBlockCount()) - 1;
     const lastBlock = await contract.blocks(lastBlockIndex);
     const previousBlockHash = ethers.keccak256(
       ethers.solidityPacked(
@@ -232,12 +236,19 @@ const submitRollupBlock = async () => {
     console.log("State Root:", stateRoot);
     console.log("Transactions:", transactions);
 
-    const tx = await contract.submitBlock(previousBlockHash, stateRoot, data);
-    await tx.wait();
+    const tx = await contract.submitBlock(
+      previousBlockHash,
+      stateRoot,
+      data,
+      [aliceAddress, bobAddress],
+      [aliceBalance, bobBalance]
+    );
+    const result = await tx.wait();
 
     // Clear the transactions array
     transactions = [];
     console.log("Rollup block submitted successfully");
+    console.log("Transaction hash: ", result.hash);
   } catch (error) {
     console.error("Error submitting rollup block:", error);
     throw error;
