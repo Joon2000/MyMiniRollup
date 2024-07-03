@@ -29,7 +29,7 @@ interface BlockData {
 
 function App() {
   const [account, setAccount] = useState("");
-  const [message, setMessage] = useState("지갑을 연결하세요");
+  const [message, setMessage] = useState("Initializing Balances from L1...");
   const [amount, setAmount] = useState("");
   const [balances, setBalances] = useState({ alice: 0, bob: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -39,6 +39,25 @@ function App() {
   const [expandedTransaction, setExpandedTransaction] = useState<number | null>(
     null
   );
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    const checkInitialization = async () => {
+      try {
+        const response = await axios.get("http://localhost:8080/init-status");
+        if (response.data.status === "initialized") {
+          setIsInitialized(true);
+          setMessage("지갑을 연결하세요");
+        } else {
+          setTimeout(checkInitialization, 3000); // Poll every 3 seconds
+        }
+      } catch (error) {
+        console.error("Error checking initialization status:", error);
+        setTimeout(checkInitialization, 3000); // Poll every 3 seconds
+      }
+    };
+    checkInitialization();
+  }, []);
 
   useEffect(() => {
     if (account) {
@@ -172,7 +191,7 @@ function App() {
         console.error(error);
       }
     } else {
-      alert("지갑을 연결하고 금액을 입력하세요.");
+      alert("Connect Wallet");
     }
   };
 
@@ -186,7 +205,7 @@ function App() {
   return (
     <div className="app">
       <h1>{message}</h1>
-      {!account && (
+      {!account && isInitialized && (
         <button className="connect-button" onClick={connectWallet}>
           메타마스크에 연결
         </button>
