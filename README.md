@@ -49,4 +49,6 @@
 
 ## To do List
 
-1. hardhat not deploying
+1. fetch balance from L1
+2. Challengeing logic
+3. state storing logic
