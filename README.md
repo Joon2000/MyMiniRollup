@@ -10,10 +10,10 @@
     ADMIN_PRIVATE_KEY =
     ```
     Private key is for hardhat deployment
-2.  set env file for client
+2.  set env file for client (./off-chain/client/.env)
 
     ```
-    # Token Address is an arbitrary address (./off-chain/client/.env)
+    # Token Address is an arbitrary address 
     REACT_APP_SEPOLIA_RPC_URL =
     REACT_APP_TOKEN_ADDRESS =
     REACT_APP_ALICE_ADDRESS =
