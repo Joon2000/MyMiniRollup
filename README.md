@@ -9,6 +9,7 @@
     ADMIN_ADDRESS =
     ADMIN_PRIVATE_KEY =
     ```
+    Private key is for hardhat deployment
 2.  set env file for client
 
     ```
