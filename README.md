@@ -1,6 +1,6 @@
 # Rollup Project
 
-1.  set env file for hardhat and server
+1.  set env file for hardhat and server (./.env)
     ```
     SEPOLIA_RPC_URL =
     PRIVATE_KEY =
@@ -12,7 +12,7 @@
 2.  set env file for client
 
     ```
-    # Token Address is an arbitrary address
+    # Token Address is an arbitrary address (./off-chain/client/.env)
     REACT_APP_SEPOLIA_RPC_URL =
     REACT_APP_TOKEN_ADDRESS =
     REACT_APP_ALICE_ADDRESS =
