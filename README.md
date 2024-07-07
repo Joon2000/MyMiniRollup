@@ -53,3 +53,4 @@
 1. UI/UX -> after fetching data login available, admin page (current block number, searching block data < current number)
 2. Challengeing logic
 3. state storing logic
+4. 다른 네트워크일때 sepolia로 바꿔달라고
