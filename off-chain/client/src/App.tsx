@@ -79,6 +79,37 @@ function App() {
     if (window.ethereum) {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
+        const { chainId } = await provider.getNetwork();
+        // Check if the user is connected to Sepolia (chainId: 11155111)
+        if (chainId !== BigInt(11155111)) {
+          try {
+            await window.ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [
+                {
+                  chainId: "0xaa36a7",
+                },
+              ],
+            });
+          } catch (switchError) {
+            if (
+              switchError instanceof Error &&
+              switchError.hasOwnProperty("code")
+            ) {
+              const error = switchError as unknown as { code: number };
+              if (error.code === 4902) {
+                // This error code indicates that the chain has not been added to MetaMask
+                alert(
+                  "Please manually add the Sepolia network to your MetaMask. Chain ID: 11155111"
+                );
+                return;
+              }
+            } else {
+              console.error(switchError);
+            }
+          }
+        }
+
         await provider.send("eth_requestAccounts", []);
         const signer = await provider.getSigner();
         const address = await signer.getAddress();
