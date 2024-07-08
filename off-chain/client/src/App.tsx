@@ -254,55 +254,62 @@ function App() {
             <>
               <h2>Alice's Balance: {balances.alice}</h2>
               <h2>Bob's Balance: {balances.bob}</h2>
-              <button
-                className="transaction-button"
-                onClick={fetchTransactions}
-              >
-                Fetch Transactions
-              </button>
-              <div className="transaction-list">
-                <h3>Transactions:</h3>
-                <ul>
-                  {transactions.map((tx, index) => (
-                    <li
-                      key={index}
-                      className="transaction-item"
-                      onClick={() =>
-                        setExpandedTransaction(
-                          expandedTransaction === index ? null : index
-                        )
-                      }
-                    >
-                      {expandedTransaction === index ? (
-                        <>
-                          <div>
-                            <strong>From:</strong> {tx.transaction.from}
-                          </div>
-                          <div>
-                            <strong>To:</strong> {tx.transaction.to}
-                          </div>
-                          <div>
-                            <strong>Amount:</strong> {tx.transaction.amount} ETH
-                          </div>
-                          <div>
-                            <strong>Signature:</strong> {tx.signature}
-                          </div>
-                        </>
-                      ) : (
-                        `${tx.transaction.from} sent ${tx.transaction.amount} ETH to ${tx.transaction.to}`
-                      )}
-                    </li>
-                  ))}
-                </ul>
+              <div className="block-info">
+                <div className="transaction-list">
+                  <h3>Current Block Number: {Number(blockNumber)}</h3>
+                  <h3>Transactions:</h3>
+                  <ul>
+                    {transactions.map((tx, index) => (
+                      <li
+                        key={index}
+                        className="transaction-item"
+                        onClick={() =>
+                          setExpandedTransaction(
+                            expandedTransaction === index ? null : index
+                          )
+                        }
+                      >
+                        {expandedTransaction === index ? (
+                          <>
+                            <div>
+                              <strong>From:</strong> {tx.transaction.from}
+                            </div>
+                            <div>
+                              <strong>To:</strong> {tx.transaction.to}
+                            </div>
+                            <div>
+                              <strong>Amount:</strong> {tx.transaction.amount}{" "}
+                              ETH
+                            </div>
+                            <div>
+                              <strong>Signature:</strong> {tx.signature}
+                            </div>
+                          </>
+                        ) : (
+                          `${tx.transaction.from} sent ${tx.transaction.amount} ETH to ${tx.transaction.to}`
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    className="transaction-button"
+                    onClick={fetchTransactions}
+                  >
+                    Fetch Transactions
+                  </button>
+                </div>
               </div>
               <div className="block-info">
-                <h3>Current Block Number: {blockNumber}</h3>
+                <h3>
+                  Latest Submitted Block Number: {Number(blockNumber) - 1}
+                </h3>
                 <input
                   type="number"
                   placeholder="Enter block number"
                   value={searchBlockNumber}
                   onChange={handleBlockNumberChange}
                   min="1"
+                  max={Number(blockNumber) - 1}
                 />
                 <button className="fetch-button" onClick={fetchBlockData}>
                   Fetch Block Data
