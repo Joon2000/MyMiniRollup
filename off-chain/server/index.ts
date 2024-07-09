@@ -21,17 +21,8 @@ const BobState = {
   value: 0,
 };
 
-let isInitialized = false; // 상태 변수 추가
-
 const app = express();
 app.use(express.json());
-
-const corsOptions = {
-  origin: "http://localhost:3000",
-  credentials: true, // 자격 증명을 허용하도록 설정
-};
-
-app.use(cors(corsOptions));
 
 const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 const privateKey = process.env.ADMIN_PRIVATE_KEY!;
@@ -61,19 +52,19 @@ const initializeBalances = async () => {
     console.log("Balance checked!!");
     console.log(`${AliceState.address} balance: ${AliceState.value}`);
     console.log(`${BobState.address} balance: ${BobState.value}`);
-
-    isInitialized = true; // 초기화 완료 후 상태 업데이트
   } catch (error) {
     console.error("Error initializing balances:", error);
   }
 };
+const corsOptions = {
+  origin: "http://localhost:3000",
+  credentials: true, // 자격 증명을 허용하도록 설정
+};
+
+app.use(cors(corsOptions));
 
 app.get("/init-status", (req: Request, res: Response) => {
-  if (isInitialized) {
-    res.json({ status: "initialized" });
-  } else {
-    res.json({ status: "initializing" });
-  }
+  res.json({ status: "initialized" });
 });
 
 app.post("/transaction-submit", async (req: Request, res: Response) => {
@@ -299,6 +290,58 @@ app.get("/block/:blockNumber", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error fetching block data:", error);
     res.status(500).send("Error fetching block data");
+  }
+});
+
+app.post("/challenge-block", async (req: Request, res: Response) => {
+  const { blockNumber } = req.body;
+  try {
+    console.log("************************************************************");
+    console.log(blockNumber, " Block Challenged");
+    // 최신 상태를 가져옴
+    const latestBlockNumber = Number(await contract.getBlockCount()) - 1;
+    let currentAliceBalance = Number(await contract.getBalance(aliceAddress));
+    let currentBobBalance = Number(await contract.getBalance(bobAddress));
+    // 최신 상태에서부터 역순으로 상태를 재구성
+    // challenged block의 이전 block까지 state 되돌리기
+    console.log("Recalculating the State Root...");
+    for (let i = latestBlockNumber; i >= blockNumber; i--) {
+      const block = await contract.getBlock(i);
+      const transactions = JSON.parse(ethers.toUtf8String(block.data));
+      console.log(transactions);
+      for (const tx of transactions) {
+        if (tx.transaction.from === "Alice") {
+          currentAliceBalance += parseInt(tx.transaction.amount);
+          currentBobBalance -= parseInt(tx.transaction.amount);
+        } else {
+          currentBobBalance += parseInt(tx.transaction.amount);
+          currentAliceBalance -= parseInt(tx.transaction.amount);
+        }
+      }
+    }
+
+    // 최종 상태 루트 계산
+    const recalculatedStateRoot = computeStateRoot(
+      currentAliceBalance,
+      currentBobBalance
+    );
+
+    console.log(
+      "Recalculated State Root of block that is preceding the challenged block: ",
+      recalculatedStateRoot
+    );
+    console.log("Comparing the State Root!");
+    // 온체인 검증을 위해 데이터 제출
+    const tx = await contract.challengeBlock(
+      blockNumber,
+      recalculatedStateRoot
+    );
+    await tx.wait();
+
+    res.send("Block challenged successfully");
+  } catch (error) {
+    console.error("Error challenging block:", error);
+    res.status(500).send("Error challenging block");
   }
 });
 

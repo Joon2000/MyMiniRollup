@@ -81,7 +81,8 @@ button:hover {
 }
 
 .transaction-button,
-.fetch-button {
+.fetch-button,
+.challenge-button {
   margin-top: 1rem;
 }
 

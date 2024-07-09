@@ -234,6 +234,29 @@ function App() {
     }
   };
 
+  const challengeBlock = async () => {
+    if (account === adminAddress) {
+      try {
+        const blockNumberToChallenge = parseInt(searchBlockNumber);
+        const response = await axios.post(
+          "http://localhost:8080/challenge-block",
+          {
+            blockNumber: blockNumberToChallenge,
+          }
+        );
+
+        if (response.status === 200) {
+          alert("Block challenged successfully!");
+        } else {
+          alert("Failed to challenge the block.");
+        }
+      } catch (error) {
+        console.error("Error challenging block:", error);
+        alert("Error challenging block.");
+      }
+    }
+  };
+
   return (
     <div className="app">
       <h1>{message}</h1>
@@ -373,6 +396,9 @@ function App() {
                     </ul>
                   </div>
                 )}
+                <button className="challenge-button" onClick={challengeBlock}>
+                  Challenge Block
+                </button>
               </div>
             </>
           )}
