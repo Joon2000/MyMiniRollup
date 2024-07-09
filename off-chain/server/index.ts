@@ -21,8 +21,17 @@ const BobState = {
   value: 0,
 };
 
+let isInitialized = false; // 상태 변수 추가
+
 const app = express();
 app.use(express.json());
+
+const corsOptions = {
+  origin: "http://localhost:3000",
+  credentials: true, // 자격 증명을 허용하도록 설정
+};
+
+app.use(cors(corsOptions));
 
 const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 const privateKey = process.env.ADMIN_PRIVATE_KEY!;
@@ -52,19 +61,19 @@ const initializeBalances = async () => {
     console.log("Balance checked!!");
     console.log(`${AliceState.address} balance: ${AliceState.value}`);
     console.log(`${BobState.address} balance: ${BobState.value}`);
+
+    isInitialized = true; // 초기화 완료 후 상태 업데이트
   } catch (error) {
     console.error("Error initializing balances:", error);
   }
 };
-const corsOptions = {
-  origin: "http://localhost:3000",
-  credentials: true, // 자격 증명을 허용하도록 설정
-};
-
-app.use(cors(corsOptions));
 
 app.get("/init-status", (req: Request, res: Response) => {
-  res.json({ status: "initialized" });
+  if (isInitialized) {
+    res.json({ status: "initialized" });
+  } else {
+    res.json({ status: "initializing" });
+  }
 });
 
 app.post("/transaction-submit", async (req: Request, res: Response) => {

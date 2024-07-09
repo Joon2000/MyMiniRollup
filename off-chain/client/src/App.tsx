@@ -49,6 +49,7 @@ function App() {
           setIsInitialized(true);
           setMessage("지갑을 연결하세요");
         } else {
+          setIsInitialized(false);
           setTimeout(checkInitialization, 3000); // Poll every 3 seconds
         }
       } catch (error) {
