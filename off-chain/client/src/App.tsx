@@ -35,6 +35,7 @@ function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [blockNumber, setBlockNumber] = useState("");
   const [searchBlockNumber, setSearchBlockNumber] = useState("1");
+  const [challengeBlockNumber, setChallengeBlockNumber] = useState("1");
   const [blockData, setBlockData] = useState<BlockData | null>(null);
   const [expandedTransaction, setExpandedTransaction] = useState<number | null>(
     null
@@ -234,10 +235,19 @@ function App() {
     }
   };
 
+  const handleChallengeBlockNumberChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const value = parseInt(e.target.value, 10);
+    if (value >= 1) {
+      setChallengeBlockNumber(e.target.value);
+    }
+  };
+
   const challengeBlock = async () => {
     if (account === adminAddress) {
       try {
-        const blockNumberToChallenge = parseInt(searchBlockNumber);
+        const blockNumberToChallenge = parseInt(challengeBlockNumber);
         const response = await axios.post(
           "http://localhost:8080/challenge-block",
           {
@@ -415,9 +425,22 @@ function App() {
                     </ul>
                   </div>
                 )}
+              </div>
+              <div className="block-info">
+                <h3>Challenge Block !!</h3>
+                <input
+                  type="number"
+                  placeholder="Enter block number"
+                  value={challengeBlockNumber}
+                  onChange={handleChallengeBlockNumberChange}
+                  min="1"
+                  max={Number(blockNumber) - 1}
+                />
                 <button className="challenge-button" onClick={challengeBlock}>
                   Challenge Block
                 </button>
+              </div>
+              <div className="malicious-button-container">
                 <button
                   className="malicious-button"
                   onClick={submitMaliciousBlock}
