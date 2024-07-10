@@ -28,7 +28,7 @@ const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 const privateKey = process.env.ADMIN_PRIVATE_KEY!;
 const wallet = new ethers.Wallet(privateKey, provider);
 // const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
-const contractAddress = "0x0488fa84Bb598A2B645ce4bfa76690248161965B";
+const contractAddress = "0xBc2e28791F4cA39169CEF04E2e269e4B8C27B136";
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
 
 let transactions: {
@@ -350,7 +350,7 @@ app.post("/challenge-block", async (req: Request, res: Response) => {
     let bobBalance = 100; // 초기 상태를 기준으로 설정
 
     // 이전 블록부터 현재 챌린지된 블록까지의 상태를 재구성
-    for (let i = 0; i < blockNumber; i++) {
+    for (let i = 1; i < blockNumber; i++) {
       const block = await contract.getBlock(i);
       const transactions = JSON.parse(ethers.toUtf8String(block.data));
       for (const tx of transactions) {
@@ -382,17 +382,99 @@ app.post("/challenge-block", async (req: Request, res: Response) => {
 
     res.send("Block challenged successfully");
   } catch (error) {
-    if (typeof error === "object" && error !== null && "reason" in error) {
-      console.error("Error challenging block:", (error as any).reason);
-      res.status(500).send(`Error challenging block: ${(error as any).reason}`);
-    } else if (error instanceof Error) {
-      console.error("Error challenging block:", error.message);
-      res.status(500).send(`Error challenging block: ${error.message}`);
-    } else {
-      console.error("Error challenging block:", error);
-      res.status(500).send("Error challenging block");
-    }
+    // if (typeof error === "object" && error !== null && "reason" in error) {
+    //   console.error("Error challenging block:", (error as any).reason);
+    //   res.status(500).send(`Error challenging block: ${(error as any).reason}`);
+    // } else if (error instanceof Error) {
+    //   console.error("Error challenging block:", error.message);
+    //   res.status(500).send(`Error challenging block: ${error.message}`);
+    // } else {
+    //   console.error("Error challenging block:", error);
+    //   res.status(500).send("Error challenging block");
+    // }
+    console.error("Error challenging block:", error);
+    res.status(500).send("Error challenging block");
     console.log("************************************************************");
+  }
+});
+
+const submitMaliciousRollupBlock = async () => {
+  try {
+    // Fetch the last block to get the previous block hash
+    const lastBlockIndex = Number(await contract.getBlockCount()) - 1;
+    const lastBlock = await contract.blocks(lastBlockIndex);
+    const previousBlockHash = ethers.keccak256(
+      ethers.solidityPacked(
+        ["uint256", "bytes32", "bytes32", "bytes", "uint256"],
+        [
+          lastBlock.blockNumber,
+          lastBlock.previousBlockHash,
+          lastBlock.stateRoot,
+          lastBlock.data,
+          lastBlock.timestamp,
+        ]
+      )
+    );
+
+    // 악의적인 상태 루트를 생성
+    const maliciousAliceBalance = AliceState.value + 100; // 악의적인 변경
+    const maliciousBobBalance = BobState.value - 100; // 악의적인 변경
+    const maliciousStateRoot = computeStateRoot(
+      maliciousAliceBalance,
+      maliciousBobBalance
+    );
+
+    // Serialize transactions
+    const data = ethers.hexlify(
+      ethers.toUtf8Bytes(JSON.stringify(transactions))
+    );
+
+    // Submit the malicious block to the smart contract
+    console.log(
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    );
+    console.log(
+      "Submitting malicious rollup block with the following details:"
+    );
+    console.log("Previous Block Hash:", previousBlockHash);
+    console.log("Malicious State Root:", maliciousStateRoot);
+    console.log("Transactions:", transactions);
+    console.log("Alice malicious balance: ", maliciousAliceBalance);
+    console.log("Bob malicious balance: ", maliciousBobBalance);
+
+    const tx = await contract.submitBlock(
+      previousBlockHash,
+      maliciousStateRoot,
+      data,
+      [aliceAddress, bobAddress],
+      [maliciousAliceBalance, maliciousBobBalance]
+    );
+    const result = await tx.wait();
+
+    // Clear the transactions array
+    transactions = [];
+    console.log("Malicious rollup block submitted successfully");
+    console.log("Transaction hash: ", result.hash);
+    console.log(
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    );
+  } catch (error) {
+    console.error("Error submitting malicious rollup block:", error);
+    console.log(
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    );
+    throw error;
+  }
+};
+
+// 악의적인 블록을 제출하는 엔드포인트 추가
+app.post("/submit-malicious-block", async (req: Request, res: Response) => {
+  try {
+    await submitMaliciousRollupBlock();
+    res.send("Malicious block submitted successfully");
+  } catch (error) {
+    console.error("Error submitting malicious block:", error);
+    res.status(500).send("Error submitting malicious block");
   }
 });
 

@@ -257,6 +257,25 @@ function App() {
     }
   };
 
+  const submitMaliciousBlock = async () => {
+    if (account === adminAddress) {
+      try {
+        const response = await axios.post(
+          "http://localhost:8080/submit-malicious-block"
+        );
+
+        if (response.status === 200) {
+          alert("Malicious block submitted successfully!");
+        } else {
+          alert("Failed to submit malicious block.");
+        }
+      } catch (error) {
+        console.error("Error submitting malicious block:", error);
+        alert("Error submitting malicious block.");
+      }
+    }
+  };
+
   return (
     <div className="app">
       <h1>{message}</h1>
@@ -398,6 +417,12 @@ function App() {
                 )}
                 <button className="challenge-button" onClick={challengeBlock}>
                   Challenge Block
+                </button>
+                <button
+                  className="malicious-button"
+                  onClick={submitMaliciousBlock}
+                >
+                  Submit Malicious Block
                 </button>
               </div>
             </>
