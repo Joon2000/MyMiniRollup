@@ -28,7 +28,7 @@ const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 const privateKey = process.env.ADMIN_PRIVATE_KEY!;
 const wallet = new ethers.Wallet(privateKey, provider);
 // const contractAddress = RollupModule["RollupModule#OptimisticRollup"];
-const contractAddress = "0xcf55A6F17F338b811987bfFC74fb039AF74Dc597";
+const contractAddress = "0x0488fa84Bb598A2B645ce4bfa76690248161965B";
 const contract = new ethers.Contract(contractAddress, Rollup.abi, wallet);
 
 let transactions: {
@@ -295,20 +295,25 @@ app.get("/block/:blockNumber", async (req: Request, res: Response) => {
 
 app.post("/challenge-block", async (req: Request, res: Response) => {
   const { blockNumber } = req.body;
+  console.log("************************************************************");
+  console.log(`Received challenge request for block number: ${blockNumber}`);
+
   try {
-    console.log("************************************************************");
-    console.log(blockNumber, " Block Challenged");
     // 최신 상태를 가져옴
     const latestBlockNumber = Number(await contract.getBlockCount()) - 1;
     let currentAliceBalance = Number(await contract.getBalance(aliceAddress));
     let currentBobBalance = Number(await contract.getBalance(bobAddress));
+
+    console.log(`Latest block number: ${latestBlockNumber}`);
+    console.log(
+      `Current balances - Alice: ${currentAliceBalance}, Bob: ${currentBobBalance}`
+    );
+
     // 최신 상태에서부터 역순으로 상태를 재구성
-    // challenged block의 이전 block까지 state 되돌리기
     console.log("Recalculating the State Root...");
     for (let i = latestBlockNumber; i >= blockNumber; i--) {
       const block = await contract.getBlock(i);
       const transactions = JSON.parse(ethers.toUtf8String(block.data));
-      console.log(transactions);
       for (const tx of transactions) {
         if (tx.transaction.from === "Alice") {
           currentAliceBalance += parseInt(tx.transaction.amount);
@@ -320,6 +325,9 @@ app.post("/challenge-block", async (req: Request, res: Response) => {
       }
     }
 
+    console.log("Recalculated Alice balance: ", currentAliceBalance);
+    console.log("Recalculated Bob balance: ", currentBobBalance);
+
     // 최종 상태 루트 계산
     const recalculatedStateRoot = computeStateRoot(
       currentAliceBalance,
@@ -327,21 +335,64 @@ app.post("/challenge-block", async (req: Request, res: Response) => {
     );
 
     console.log(
-      "Recalculated State Root of block that is preceding the challenged block: ",
-      recalculatedStateRoot
+      `Recalculated State Root for the block preceding the challenged block: ${recalculatedStateRoot}`
     );
-    console.log("Comparing the State Root!");
+    console.log("Comparing the State Root...");
+
     // 온체인 검증을 위해 데이터 제출
-    const tx = await contract.challengeBlock(
-      blockNumber,
-      recalculatedStateRoot
+    let tx = await contract.challengeBlock(blockNumber, recalculatedStateRoot);
+    await tx.wait();
+
+    console.log("Challenge successful. Rolling back state...");
+
+    // 초기 상태 설정
+    let aliceBalance = 100; // 초기 상태를 기준으로 설정
+    let bobBalance = 100; // 초기 상태를 기준으로 설정
+
+    // 이전 블록부터 현재 챌린지된 블록까지의 상태를 재구성
+    for (let i = 0; i < blockNumber; i++) {
+      const block = await contract.getBlock(i);
+      const transactions = JSON.parse(ethers.toUtf8String(block.data));
+      for (const tx of transactions) {
+        if (tx.transaction.from === "Alice") {
+          aliceBalance -= parseInt(tx.transaction.amount);
+          bobBalance += parseInt(tx.transaction.amount);
+        } else {
+          bobBalance -= parseInt(tx.transaction.amount);
+          aliceBalance += parseInt(tx.transaction.amount);
+        }
+      }
+    }
+
+    console.log(
+      `Reconstructed balances - Alice: ${aliceBalance}, Bob: ${bobBalance}`
+    );
+
+    tx = await contract.updateBalances(
+      [aliceAddress, bobAddress],
+      [aliceBalance, bobBalance]
     );
     await tx.wait();
 
+    AliceState.value = aliceBalance;
+    BobState.value = bobBalance;
+
+    console.log("State successfully rolled back.");
+    console.log("************************************************************");
+
     res.send("Block challenged successfully");
   } catch (error) {
-    console.error("Error challenging block:", error);
-    res.status(500).send("Error challenging block");
+    if (typeof error === "object" && error !== null && "reason" in error) {
+      console.error("Error challenging block:", (error as any).reason);
+      res.status(500).send(`Error challenging block: ${(error as any).reason}`);
+    } else if (error instanceof Error) {
+      console.error("Error challenging block:", error.message);
+      res.status(500).send(`Error challenging block: ${error.message}`);
+    } else {
+      console.error("Error challenging block:", error);
+      res.status(500).send("Error challenging block");
+    }
+    console.log("************************************************************");
   }
 });
 
