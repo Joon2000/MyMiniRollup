@@ -11,7 +11,6 @@ contract OptimisticRollup {
     }
 
     RollupBlock[] public blocks;
-    mapping(uint256 => bool) public isChallenged;
     mapping(address => uint256) public balances;
     mapping(address => bool) public hasInteracted;
 
@@ -19,7 +18,7 @@ contract OptimisticRollup {
     uint256 public constant INITIAL_BALANCE = 100;
 
     event BlockSubmitted(uint256 blockNumber, bytes32 stateRoot, bytes data, uint256 timestamp);
-    event BlockChallenged(uint256 blockNumber, address challenger);
+    event BlockChallenged(uint256 blockNumber);
 
     constructor() {
         // Initial values for the genesis block
@@ -81,18 +80,31 @@ contract OptimisticRollup {
         return balances[account];
     }
 
-    // function challengeBlock(uint256 blockNumber, bytes32 correctStateRoot, bytes memory proofData) public {
-    //     require(blockNumber < blocks.length, "Invalid block number");
-    //     require(!isChallenged[blockNumber], "Block already challenged");
+    function challengeBlock(uint256 blockNumber, bytes32 recalculatedStateRoot) public {
+        require(blockNumber < blocks.length, "Invalid block number");
 
-    //     RollupBlock memory blockToChallenge = blocks[blockNumber];
-    //     require(block.timestamp <= blockToChallenge.timestamp + CHALLENGE_PERIOD, "Challenge period has ended");
+        // 챌린지된 블록의 이전 블록을 가져옴
+        RollupBlock memory blockToChallenge = blocks[blockNumber - 1];
+        require(block.timestamp <= blockToChallenge.timestamp + CHALLENGE_PERIOD, "Challenge period has ended");
 
-    //     // Add your verification logic here to validate proofData
-    //     require(blockToChallenge.stateRoot != correctStateRoot, "Block is correct");
+        // 상태 루트 비교
+        require(recalculatedStateRoot != blockToChallenge.stateRoot, "Block is correct");
 
-    //     isChallenged[blockNumber] = true;
+        emit BlockChallenged(blockNumber);
 
-    //     emit BlockChallenged(blockNumber, msg.sender);
-    // }
+        uint256 revertToBlock = blockNumber - 1;
+
+        // 무효화할 블록 제거
+        for (uint256 i = blocks.length - 1; i > revertToBlock; i--) {
+            blocks.pop();
+        }
+    }
+
+    function updateBalances(address[] memory accounts, uint256[] memory newBalances) public {
+        require(accounts.length == newBalances.length, "Accounts and balances length mismatch");
+
+        for (uint256 i = 0; i < accounts.length; i++) {
+            balances[accounts[i]] = newBalances[i];
+        }
+    }
 }
