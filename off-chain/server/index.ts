@@ -21,6 +21,8 @@ const BobState = {
   value: 0,
 };
 
+let isInitialized = false; // 상태 변수 추가
+
 const app = express();
 app.use(express.json());
 
@@ -52,6 +54,8 @@ const initializeBalances = async () => {
     console.log("Balance checked!!");
     console.log(`${AliceState.address} balance: ${AliceState.value}`);
     console.log(`${BobState.address} balance: ${BobState.value}`);
+
+    isInitialized = true; // 초기화 완료 후 상태 업데이트
   } catch (error) {
     console.error("Error initializing balances:", error);
   }
@@ -64,7 +68,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.get("/init-status", (req: Request, res: Response) => {
-  res.json({ status: "initialized" });
+  if (isInitialized) {
+    res.json({ status: "initialized" });
+  } else {
+    res.json({ status: "initializing" });
+  }
 });
 
 app.post("/transaction-submit", async (req: Request, res: Response) => {
@@ -382,18 +390,17 @@ app.post("/challenge-block", async (req: Request, res: Response) => {
 
     res.send("Block challenged successfully");
   } catch (error) {
-    // if (typeof error === "object" && error !== null && "reason" in error) {
-    //   console.error("Error challenging block:", (error as any).reason);
-    //   res.status(500).send(`Error challenging block: ${(error as any).reason}`);
-    // } else if (error instanceof Error) {
-    //   console.error("Error challenging block:", error.message);
-    //   res.status(500).send(`Error challenging block: ${error.message}`);
-    // } else {
-    //   console.error("Error challenging block:", error);
-    //   res.status(500).send("Error challenging block");
-    // }
-    console.error("Error challenging block:", error);
-    res.status(500).send("Error challenging block");
+    if (typeof error === "object" && error !== null && "reason" in error) {
+      console.error("Error challenging block:", (error as any).reason);
+      res.status(500).send(`Error challenging block: ${(error as any).reason}`);
+    } else if (error instanceof Error) {
+      console.error("Error challenging block:", error.message);
+      res.status(500).send(`Error challenging block: ${error.message}`);
+    } else {
+      console.error("Error challenging block:", error);
+      res.status(500).send("Error challenging block");
+    }
+
     console.log("************************************************************");
   }
 });
@@ -423,6 +430,9 @@ const submitMaliciousRollupBlock = async () => {
       maliciousAliceBalance,
       maliciousBobBalance
     );
+
+    AliceState.value = maliciousAliceBalance;
+    BobState.value = maliciousBobBalance;
 
     // Serialize transactions
     const data = ethers.hexlify(
