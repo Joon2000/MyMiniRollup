@@ -13,7 +13,7 @@
 2.  set env file for client (./off-chain/client/.env)
 
     ```
-    # Token Address is an arbitrary address 
+    # Token Address is an arbitrary address
     REACT_APP_SEPOLIA_RPC_URL =
     REACT_APP_TOKEN_ADDRESS =
     REACT_APP_ALICE_ADDRESS =
